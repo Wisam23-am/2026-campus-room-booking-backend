@@ -1,6 +1,51 @@
 @_2026_campus_room_booking_backend_HostAddress = http://localhost:5168
 
-GET {{_2026_campus_room_booking_backend_HostAddress}}/weatherforecast/
+### Get all bookings
+GET {{_2026_campus_room_booking_backend_HostAddress}}/api/roombooking
 Accept: application/json
+
+### Get booking by ID
+GET {{_2026_campus_room_booking_backend_HostAddress}}/api/roombooking/1
+Accept: application/json
+
+### Create a new booking
+POST {{_2026_campus_room_booking_backend_HostAddress}}/api/roombooking
+Content-Type: application/json
+
+{
+  "roomName": "Lab Komputer 1",
+  "bookedBy": "Ahmad Wisam",
+  "purpose": "Praktikum Pemrograman Web",
+  "startTime": "2026-02-10T08:00:00",
+  "endTime": "2026-02-10T10:00:00"
+}
+
+### Create another booking
+POST {{_2026_campus_room_booking_backend_HostAddress}}/api/roombooking
+Content-Type: application/json
+
+{
+  "roomName": "Ruang Seminar A",
+  "bookedBy": "Budi Santoso",
+  "purpose": "Seminar Tugas Akhir",
+  "startTime": "2026-02-11T13:00:00",
+  "endTime": "2026-02-11T15:00:00"
+}
+
+### Update booking (change status to Approved)
+PUT {{_2026_campus_room_booking_backend_HostAddress}}/api/roombooking/1
+Content-Type: application/json
+
+{
+  "roomName": "Lab Komputer 1",
+  "bookedBy": "Ahmad Wisam",
+  "purpose": "Praktikum Pemrograman Web",
+  "startTime": "2026-02-10T08:00:00",
+  "endTime": "2026-02-10T10:00:00",
+  "status": 1
+}
+
+### Delete booking (soft delete)
+DELETE {{_2026_campus_room_booking_backend_HostAddress}}/api/roombooking/1
 
 ###
