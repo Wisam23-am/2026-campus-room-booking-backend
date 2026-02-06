@@ -113,7 +113,11 @@ public class RoomBookingController : ControllerBase
 
         if (booking == null)
         {
-            return NotFound(new { message = $"Booking with ID {id} not found" });
+            return NotFound(new ErrorResponseDto
+            {
+                StatusCode = 404,
+                Message = $"Booking with ID {id} not found"
+            });
         }
 
         return Ok(MapToResponseDto(booking));
@@ -129,13 +133,47 @@ public class RoomBookingController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            var errors = ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.Value!.Errors.Select(e => e.ErrorMessage).ToList()
+                );
+
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = errors
+            });
         }
 
         // Validate: EndTime must be after StartTime
         if (dto.EndTime <= dto.StartTime)
         {
-            return BadRequest(new { message = "End time must be after start time" });
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "EndTime", new List<string> { "End time must be after start time" } }
+                }
+            });
+        }
+
+        // Validate: Cannot book in the past
+        if (dto.StartTime < DateTime.UtcNow)
+        {
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "StartTime", new List<string> { "Cannot book in the past" } }
+                }
+            });
         }
 
         var booking = new RoomBooking
@@ -170,13 +208,33 @@ public class RoomBookingController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            return BadRequest(ModelState);
+            var errors = ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.Value!.Errors.Select(e => e.ErrorMessage).ToList()
+                );
+
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = errors
+            });
         }
 
         // Validate: EndTime must be after StartTime
         if (dto.EndTime <= dto.StartTime)
         {
-            return BadRequest(new { message = "End time must be after start time" });
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "EndTime", new List<string> { "End time must be after start time" } }
+                }
+            });
         }
 
         var booking = await _context.RoomBookings
@@ -184,7 +242,11 @@ public class RoomBookingController : ControllerBase
 
         if (booking == null)
         {
-            return NotFound(new { message = $"Booking with ID {id} not found" });
+            return NotFound(new ErrorResponseDto
+            {
+                StatusCode = 404,
+                Message = $"Booking with ID {id} not found"
+            });
         }
 
         booking.RoomName = dto.RoomName;
@@ -213,7 +275,11 @@ public class RoomBookingController : ControllerBase
 
         if (booking == null)
         {
-            return NotFound(new { message = $"Booking with ID {id} not found" });
+            return NotFound(new ErrorResponseDto
+            {
+                StatusCode = 404,
+                Message = $"Booking with ID {id} not found"
+            });
         }
 
         booking.IsDeleted = true;

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using _2026_campus_room_booking_backend.Data;
+using _2026_campus_room_booking_backend.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,9 @@ builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Global exception handler
+app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
