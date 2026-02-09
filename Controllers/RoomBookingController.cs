@@ -176,6 +176,26 @@ public class RoomBookingController : ControllerBase
             });
         }
 
+        // Validate: No overlapping bookings for the same room
+        var hasOverlap = await _context.RoomBookings.AnyAsync(b =>
+            !b.IsDeleted &&
+            b.RoomName == dto.RoomName &&
+            b.StartTime < dto.EndTime &&
+            b.EndTime > dto.StartTime);
+
+        if (hasOverlap)
+        {
+            return Conflict(new ErrorResponseDto
+            {
+                StatusCode = 409,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "Schedule", new List<string> { $"Room '{dto.RoomName}' is already booked during the requested time slot" } }
+                }
+            });
+        }
+
         var booking = new RoomBooking
         {
             RoomName = dto.RoomName,
@@ -246,6 +266,27 @@ public class RoomBookingController : ControllerBase
             {
                 StatusCode = 404,
                 Message = $"Booking with ID {id} not found"
+            });
+        }
+
+        // Validate: No overlapping bookings for the same room (exclude current booking)
+        var hasOverlap = await _context.RoomBookings.AnyAsync(b =>
+            !b.IsDeleted &&
+            b.Id != id &&
+            b.RoomName == dto.RoomName &&
+            b.StartTime < dto.EndTime &&
+            b.EndTime > dto.StartTime);
+
+        if (hasOverlap)
+        {
+            return Conflict(new ErrorResponseDto
+            {
+                StatusCode = 409,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "Schedule", new List<string> { $"Room '{dto.RoomName}' is already booked during the requested time slot" } }
+                }
             });
         }
 
