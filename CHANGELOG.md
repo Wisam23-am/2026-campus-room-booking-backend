@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-14
+
+### Added
+- User entity and CRUD endpoints (`/api/users`)
+- Room entity and CRUD endpoints (`/api/rooms`)
+- Comprehensive API test cases
+- Indexes for optimized queries (RoomName, BookedBy, StartTime)
+
+### Fixed
+- Input validation edge cases
+- Error response standardization
+
+### Changed
+- Enhanced BookingStatus enum handling
+- Improved database indexing strategy
+
 ## [1.0.0] - 2026-02-07
 
 ### Added
