@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using _2026_campus_room_booking_backend.Data;
 
@@ -10,9 +11,11 @@ using _2026_campus_room_booking_backend.Data;
 namespace _2026_campus_room_booking_backend.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260213233356_UpdateCampusRoomSeedData")]
+    partial class UpdateCampusRoomSeedData
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.2");
@@ -43,11 +46,6 @@ namespace _2026_campus_room_booking_backend.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(false);
 
-                    b.Property<string>("Password")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
                     b.Property<int>("Role")
                         .HasColumnType("INTEGER");
 
@@ -73,7 +71,6 @@ namespace _2026_campus_room_booking_backend.Migrations
                             Email = "admin@campus.local",
                             FullName = "Admin User",
                             IsDeleted = false,
-                            Password = "$2a$11$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5YmMxSUaqzpva",
                             Role = 1
                         },
                         new
@@ -83,7 +80,6 @@ namespace _2026_campus_room_booking_backend.Migrations
                             Email = "student@campus.local",
                             FullName = "Student User",
                             IsDeleted = false,
-                            Password = "$2a$11$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5YmMxSUaqzpva",
                             Role = 0
                         },
                         new
@@ -93,7 +89,6 @@ namespace _2026_campus_room_booking_backend.Migrations
                             Email = "dosen@campus.local",
                             FullName = "Dosen Pembimbing",
                             IsDeleted = false,
-                            Password = "$2a$11$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5YmMxSUaqzpva",
                             Role = 0
                         },
                         new
@@ -103,7 +98,6 @@ namespace _2026_campus_room_booking_backend.Migrations
                             Email = "staff@campus.local",
                             FullName = "Staff Akademik",
                             IsDeleted = false,
-                            Password = "$2a$11$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5YmMxSUaqzpva",
                             Role = 1
                         },
                         new
@@ -113,7 +107,6 @@ namespace _2026_campus_room_booking_backend.Migrations
                             Email = "mahasiswa.if@campus.local",
                             FullName = "Mahasiswa Informatika",
                             IsDeleted = false,
-                            Password = "$2a$11$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5YmMxSUaqzpva",
                             Role = 0
                         });
                 });
