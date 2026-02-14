@@ -20,6 +20,10 @@ public class AppUser
     public string Email { get; set; } = string.Empty;
 
     [Required]
+    [StringLength(255)] // Hashed password
+    public string Password { get; set; } = string.Empty;
+
+    [Required]
     public UserRole Role { get; set; } = UserRole.User;
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
