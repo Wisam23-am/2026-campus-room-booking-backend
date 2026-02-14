@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-15
+
+### Added
+- Password field to AppUser model for authentication
+- Database migration: AddPasswordToUsers for ALTER TABLE users
+- Seed data: 15 campus rooms (Gedung D4, D3, SAW, PascaSarjana)
+- Seed data: 5 test users with hashed passwords and roles (Admin/User)
+- CORS configuration for frontend development (localhost:3000, localhost:3001)
+
+### Features
+- Backend password infrastructure ready for authentication service
+- Test database with complete room and user fixtures
+- Multi-building room organization with unique identification
+- Role-based test users for different access levels
+
 ## [1.1.0] - 2026-02-14
 
 ### Added
