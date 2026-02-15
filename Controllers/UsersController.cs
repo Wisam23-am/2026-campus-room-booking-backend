@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
+using BCrypt.Net;
 using _2026_campus_room_booking_backend.Data;
 using _2026_campus_room_booking_backend.DTOs;
 using _2026_campus_room_booking_backend.Models;
@@ -11,6 +13,7 @@ namespace _2026_campus_room_booking_backend.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin")]
 public class UsersController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
@@ -88,7 +91,8 @@ public class UsersController : ControllerBase
             return BadRequest(new ErrorResponseDto { StatusCode = 400, Message = "Validation failed", Errors = errors });
         }
 
-        var emailExists = await _context.Users.AnyAsync(u => !u.IsDeleted && u.Email.ToLower() == dto.Email.ToLower());
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+        var emailExists = await _context.Users.AnyAsync(u => !u.IsDeleted && u.Email.ToLower() == normalizedEmail);
         if (emailExists)
         {
             return Conflict(new ErrorResponseDto
@@ -105,7 +109,8 @@ public class UsersController : ControllerBase
         var user = new AppUser
         {
             FullName = dto.FullName,
-            Email = dto.Email,
+            Email = normalizedEmail,
+            Password = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = dto.Role,
             CreatedAt = DateTime.UtcNow,
             IsDeleted = false
