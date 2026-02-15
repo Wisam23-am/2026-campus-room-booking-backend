@@ -1,12 +1,12 @@
 using System.ComponentModel.DataAnnotations;
-using _2026_campus_room_booking_backend.Enums;
 
 namespace _2026_campus_room_booking_backend.DTOs;
 
 /// <summary>
-/// DTO for creating a user
+/// DTO for registering a new user.
+/// Role is always decided by the server.
 /// </summary>
-public class CreateUserDto
+public class AuthRegisterDto
 {
     [Required]
     [StringLength(120, MinimumLength = 2)]
@@ -20,6 +20,4 @@ public class CreateUserDto
     [Required]
     [StringLength(100, MinimumLength = 6)]
     public string Password { get; set; } = string.Empty;
-
-    public UserRole Role { get; set; } = UserRole.User;
 }
