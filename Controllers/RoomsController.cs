@@ -177,12 +177,12 @@ public class RoomsController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(from) && DateTime.TryParse(from, out var fromDate))
         {
-            bookingsQuery = bookingsQuery.Where(b => DateTime.Parse(b.EndTime) >= fromDate);
+            bookingsQuery = bookingsQuery.Where(b => b.EndTime >= fromDate);
         }
 
         if (!string.IsNullOrWhiteSpace(to) && DateTime.TryParse(to, out var toDate))
         {
-            bookingsQuery = bookingsQuery.Where(b => DateTime.Parse(b.StartTime) <= toDate);
+            bookingsQuery = bookingsQuery.Where(b => b.StartTime <= toDate);
         }
 
         var bookings = await bookingsQuery
@@ -193,8 +193,8 @@ public class RoomsController : ControllerBase
                 RoomName = b.RoomName,
                 BookedBy = b.BookedBy,
                 Purpose = b.Purpose,
-                StartTime = b.StartTime,
-                EndTime = b.EndTime,
+                StartTime = b.StartTime.ToString("o"),
+                EndTime = b.EndTime.ToString("o"),
                 Status = (int)b.Status
             })
             .ToListAsync();
@@ -232,15 +232,15 @@ public class RoomsController : ControllerBase
             .Where(b => !b.IsDeleted &&
                         b.RoomName == room.Name &&
                         b.Status != _2026_campus_room_booking_backend.Enums.BookingStatus.Rejected &&
-                        ((DateTime.Parse(b.StartTime) < endTime && DateTime.Parse(b.EndTime) > startTime)))
+                        ((b.StartTime < endTime && b.EndTime > startTime)))
             .Select(b => new RoomScheduleDto
             {
                 BookingId = b.Id,
                 RoomName = b.RoomName,
                 BookedBy = b.BookedBy,
                 Purpose = b.Purpose,
-                StartTime = b.StartTime,
-                EndTime = b.EndTime,
+                StartTime = b.StartTime.ToString("o"),
+                EndTime = b.EndTime.ToString("o"),
                 Status = (int)b.Status
             })
             .ToListAsync();
