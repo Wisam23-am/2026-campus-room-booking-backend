@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using BCrypt.Net;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -92,6 +93,52 @@ public class AuthController : ControllerBase
             Token = token,
             User = MapToResponseDto(user)
         });
+    }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(BuildValidationError());
+        }
+
+        // Get user ID from JWT claims
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst(JwtRegisteredClaimNames.Sub);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(new ErrorResponseDto { StatusCode = 401, Message = "Invalid token" });
+        }
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null || user.IsDeleted)
+        {
+            return NotFound(new ErrorResponseDto { StatusCode = 404, Message = "User not found" });
+        }
+
+        // Verify current password
+        var isValidPassword = BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.Password);
+        if (!isValidPassword)
+        {
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "CurrentPassword", new List<string> { "Current password is incorrect" } }
+                }
+            });
+        }
+
+        // Update password
+        user.Password = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Password changed successfully" });
     }
 
     private string GenerateJwtToken(AppUser user)
