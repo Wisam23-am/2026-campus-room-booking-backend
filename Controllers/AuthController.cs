@@ -168,7 +168,7 @@ public class AuthController : ControllerBase
         // For updating own profile, we'll ignore ModelState validation for Role
         // Only validate FullName and Email
         var errors = new Dictionary<string, List<string>>();
-        
+
         if (string.IsNullOrWhiteSpace(dto.FullName) || dto.FullName.Length < 2 || dto.FullName.Length > 120)
         {
             errors.Add("FullName", new List<string> { "Full name must be between 2 and 120 characters" });
