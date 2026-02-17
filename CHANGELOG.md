@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-02-17
+
+### Added - Room Integration & Profile APIs (ISSUE #11)
+- Room schedule endpoint: `GET /api/rooms/{id}/schedule` with date filtering
+- Room availability endpoint: `GET /api/rooms/{id}/availability` for time slot checking
+- Change password endpoint: `POST /api/auth/change-password`
+- Self-service profile endpoint: `GET /api/auth/me` for authenticated user info
+- DTOs: RoomScheduleDto, RoomAvailabilityDto, ChangePasswordDto, UpdateBookingStatusDto
+
+### Changed
+- Enhanced RoomsController with schedule and availability operations
+- Improved DateTime type handling in room-related endpoints
+
+### Fixed
+- DateTime type casting in room schedule/availability queries
+- Password validation and BCrypt verification in change password flow
+
+### Related Issues
+- ISSUE #11: Room Integration & Searchable Room Select
+
+## [1.2.1] - 2026-02-16
+
+### Added
+- JWT authentication endpoints: `POST /api/auth/login` and `POST /api/auth/register`
+- Password hashing with BCrypt for registered users
+- Role-based authorization for admin-only APIs
+
+### Fixed
+- JWT signing key validation (HS256 requires sufficiently long key)
+
 ## [1.2.0] - 2026-02-15
 
 ### Added

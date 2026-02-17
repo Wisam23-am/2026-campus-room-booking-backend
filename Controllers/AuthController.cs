@@ -1,0 +1,295 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using BCrypt.Net;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using _2026_campus_room_booking_backend.Data;
+using _2026_campus_room_booking_backend.DTOs;
+using _2026_campus_room_booking_backend.Enums;
+using _2026_campus_room_booking_backend.Models;
+
+namespace _2026_campus_room_booking_backend.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class AuthController : ControllerBase
+{
+    private readonly ApplicationDbContext _context;
+    private readonly IConfiguration _configuration;
+
+    public AuthController(ApplicationDbContext context, IConfiguration configuration)
+    {
+        _context = context;
+        _configuration = configuration;
+    }
+
+    [HttpPost("register")]
+    public async Task<ActionResult<UserResponseDto>> Register(AuthRegisterDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(BuildValidationError());
+        }
+
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+        var emailExists = await _context.Users.AnyAsync(u => !u.IsDeleted && u.Email.ToLower() == normalizedEmail);
+        if (emailExists)
+        {
+            return Conflict(new ErrorResponseDto
+            {
+                StatusCode = 409,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "Email", new List<string> { "Email is already in use" } }
+                }
+            });
+        }
+
+        var user = new AppUser
+        {
+            FullName = dto.FullName.Trim(),
+            Email = normalizedEmail,
+            Password = BCrypt.Net.BCrypt.HashPassword(dto.Password),
+            Role = UserRole.User,
+            CreatedAt = DateTime.UtcNow,
+            IsDeleted = false
+        };
+
+        _context.Users.Add(user);
+        await _context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(Register), new { id = user.Id }, MapToResponseDto(user));
+    }
+
+    [HttpPost("login")]
+    public async Task<ActionResult<AuthResponseDto>> Login(AuthLoginDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(BuildValidationError());
+        }
+
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+        var user = await _context.Users.FirstOrDefaultAsync(u => !u.IsDeleted && u.Email.ToLower() == normalizedEmail);
+        if (user == null)
+        {
+            return Unauthorized(new ErrorResponseDto { StatusCode = 401, Message = "Invalid email or password" });
+        }
+
+        var isValidPassword = BCrypt.Net.BCrypt.Verify(dto.Password, user.Password);
+        if (!isValidPassword)
+        {
+            return Unauthorized(new ErrorResponseDto { StatusCode = 401, Message = "Invalid email or password" });
+        }
+
+        var token = GenerateJwtToken(user);
+
+        return Ok(new AuthResponseDto
+        {
+            Token = token,
+            User = MapToResponseDto(user)
+        });
+    }
+
+    [Authorize]
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(BuildValidationError());
+        }
+
+        // Get user ID from JWT claims
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst(JwtRegisteredClaimNames.Sub);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(new ErrorResponseDto { StatusCode = 401, Message = "Invalid token" });
+        }
+
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null || user.IsDeleted)
+        {
+            return NotFound(new ErrorResponseDto { StatusCode = 404, Message = "User not found" });
+        }
+
+        // Verify current password
+        var isValidPassword = BCrypt.Net.BCrypt.Verify(dto.CurrentPassword, user.Password);
+        if (!isValidPassword)
+        {
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "CurrentPassword", new List<string> { "Current password is incorrect" } }
+                }
+            });
+        }
+
+        // Update password
+        user.Password = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+        user.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Password changed successfully" });
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    public async Task<ActionResult<UserResponseDto>> GetCurrentUser()
+    {
+        // Get user ID from JWT claims
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst(JwtRegisteredClaimNames.Sub);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(new ErrorResponseDto { StatusCode = 401, Message = "Invalid token" });
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
+        if (user == null)
+        {
+            return NotFound(new ErrorResponseDto { StatusCode = 404, Message = "User not found" });
+        }
+
+        return Ok(MapToResponseDto(user));
+    }
+
+    [Authorize]
+    [HttpPut("me")]
+    public async Task<ActionResult<UserResponseDto>> UpdateCurrentUser(UpdateUserDto dto)
+    {
+        // For updating own profile, we'll ignore ModelState validation for Role
+        // Only validate FullName and Email
+        var errors = new Dictionary<string, List<string>>();
+
+        if (string.IsNullOrWhiteSpace(dto.FullName) || dto.FullName.Length < 2 || dto.FullName.Length > 120)
+        {
+            errors.Add("FullName", new List<string> { "Full name must be between 2 and 120 characters" });
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Email) || dto.Email.Length > 180)
+        {
+            errors.Add("Email", new List<string> { "Email is required and must not exceed 180 characters" });
+        }
+        else if (!new System.ComponentModel.DataAnnotations.EmailAddressAttribute().IsValid(dto.Email))
+        {
+            errors.Add("Email", new List<string> { "Invalid email format" });
+        }
+
+        if (errors.Any())
+        {
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = errors
+            });
+        }
+
+        // Get user ID from JWT claims
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst(JwtRegisteredClaimNames.Sub);
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out var userId))
+        {
+            return Unauthorized(new ErrorResponseDto { StatusCode = 401, Message = "Invalid token" });
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
+        if (user == null)
+        {
+            return NotFound(new ErrorResponseDto { StatusCode = 404, Message = "User not found" });
+        }
+
+        // Update only allowed fields (not role)
+        user.FullName = dto.FullName.Trim();
+
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+        // Check if email is already taken by another user
+        var emailExists = await _context.Users.AnyAsync(u => !u.IsDeleted && u.Id != userId && u.Email.ToLower() == normalizedEmail);
+        if (emailExists)
+        {
+            return Conflict(new ErrorResponseDto
+            {
+                StatusCode = 409,
+                Message = "Validation failed",
+                Errors = new Dictionary<string, List<string>>
+                {
+                    { "Email", new List<string> { "Email is already in use" } }
+                }
+            });
+        }
+        user.Email = normalizedEmail;
+
+        user.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return Ok(MapToResponseDto(user));
+    }
+
+    private string GenerateJwtToken(AppUser user)
+    {
+        var key = _configuration["Jwt:Key"] ?? Environment.GetEnvironmentVariable("JWT_SECRET") ?? "";
+        var issuer = _configuration["Jwt:Issuer"] ?? Environment.GetEnvironmentVariable("JWT_ISSUER") ?? "RoomBookingAPI";
+        var audience = _configuration["Jwt:Audience"] ?? Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "RoomBookingClient";
+        var expiresMinutesRaw = _configuration["Jwt:ExpiresMinutes"];
+        var expiresMinutes = int.TryParse(expiresMinutesRaw, out var parsed) ? parsed : 120;
+
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            // Fallback: make it explicit rather than generating an inconsistent key.
+            // This should be configured via appsettings or environment variables.
+            key = "dev-secret-change-me-please-32-bytes-minimum-123456";
+        }
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Email, user.Email),
+            new(ClaimTypes.Role, user.Role.ToString()),
+            new("role", user.Role.ToString())
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(expiresMinutes),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private ErrorResponseDto BuildValidationError()
+    {
+        var errors = ModelState
+            .Where(x => x.Value?.Errors.Count > 0)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Value!.Errors.Select(e => e.ErrorMessage).ToList()
+            );
+
+        return new ErrorResponseDto { StatusCode = 400, Message = "Validation failed", Errors = errors };
+    }
+
+    private static UserResponseDto MapToResponseDto(AppUser user)
+    {
+        return new UserResponseDto
+        {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt
+        };
+    }
+}

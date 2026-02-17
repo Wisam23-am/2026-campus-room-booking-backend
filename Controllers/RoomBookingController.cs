@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using _2026_campus_room_booking_backend.Data;
 using _2026_campus_room_booking_backend.DTOs;
 using _2026_campus_room_booking_backend.Enums;
@@ -295,6 +296,78 @@ public class RoomBookingController : ControllerBase
         booking.Purpose = dto.Purpose;
         booking.StartTime = dto.StartTime;
         booking.EndTime = dto.EndTime;
+        booking.Status = dto.Status;
+        booking.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(MapToResponseDto(booking));
+    }
+
+    /// <summary>
+    /// Update booking status only (approve/reject)
+    /// </summary>
+    /// <param name="id">Booking ID</param>
+    /// <param name="dto">Status update</param>
+    /// <returns>Updated booking</returns>
+    [HttpPut("{id}/status")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<BookingResponseDto>> UpdateBookingStatus(int id, UpdateBookingStatusDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState
+                .Where(x => x.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    x => x.Key,
+                    x => x.Value!.Errors.Select(e => e.ErrorMessage).ToList()
+                );
+
+            return BadRequest(new ErrorResponseDto
+            {
+                StatusCode = 400,
+                Message = "Validation failed",
+                Errors = errors
+            });
+        }
+
+        var booking = await _context.RoomBookings
+            .FirstOrDefaultAsync(b => b.Id == id && !b.IsDeleted);
+
+        if (booking == null)
+        {
+            return NotFound(new ErrorResponseDto
+            {
+                StatusCode = 404,
+                Message = $"Booking with ID {id} not found"
+            });
+        }
+
+        // If approving, ensure there's no conflict with an already approved booking.
+        if (dto.Status == BookingStatus.Approved)
+        {
+            var hasOverlap = await _context.RoomBookings.AnyAsync(b =>
+                !b.IsDeleted &&
+                b.Id != id &&
+                b.Status == BookingStatus.Approved &&
+                b.RoomName == booking.RoomName &&
+                b.StartTime < booking.EndTime &&
+                b.EndTime > booking.StartTime);
+
+            if (hasOverlap)
+            {
+                return Conflict(new ErrorResponseDto
+                {
+                    StatusCode = 409,
+                    Message = "Validation failed",
+                    Errors = new Dictionary<string, List<string>>
+                    {
+                        { "Schedule", new List<string> { $"Room '{booking.RoomName}' is already booked during the requested time slot" } }
+                    }
+                });
+            }
+        }
+
         booking.Status = dto.Status;
         booking.UpdatedAt = DateTime.UtcNow;
 

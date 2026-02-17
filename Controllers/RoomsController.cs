@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using _2026_campus_room_booking_backend.Data;
 using _2026_campus_room_booking_backend.DTOs;
 using _2026_campus_room_booking_backend.Models;
@@ -76,6 +77,7 @@ public class RoomsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<RoomResponseDto>> CreateRoom(CreateRoomDto dto)
     {
         if (!ModelState.IsValid)
@@ -110,6 +112,7 @@ public class RoomsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<RoomResponseDto>> UpdateRoom(int id, UpdateRoomDto dto)
     {
         if (!ModelState.IsValid)
@@ -144,6 +147,7 @@ public class RoomsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteRoom(int id)
     {
         var room = await _context.Rooms.FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
@@ -157,6 +161,115 @@ public class RoomsController : ControllerBase
         await _context.SaveChangesAsync();
 
         return NoContent();
+    }
+
+    [HttpGet("{id}/schedule")]
+    public async Task<ActionResult<List<RoomScheduleDto>>> GetRoomSchedule(int id, [FromQuery] string? from, [FromQuery] string? to)
+    {
+        var room = await _context.Rooms.FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+        if (room == null)
+        {
+            return NotFound(new ErrorResponseDto { StatusCode = 404, Message = $"Room with ID {id} not found" });
+        }
+
+        var bookingsQuery = _context.RoomBookings
+            .Where(b => !b.IsDeleted && b.RoomName == room.Name);
+
+        if (!string.IsNullOrWhiteSpace(from) && DateTime.TryParse(from, out var fromDate))
+        {
+            bookingsQuery = bookingsQuery.Where(b => b.EndTime >= fromDate);
+        }
+
+        if (!string.IsNullOrWhiteSpace(to) && DateTime.TryParse(to, out var toDate))
+        {
+            bookingsQuery = bookingsQuery.Where(b => b.StartTime <= toDate);
+        }
+
+        var bookings = await bookingsQuery
+            .OrderBy(b => b.StartTime)
+            .Select(b => new RoomScheduleDto
+            {
+                BookingId = b.Id,
+                RoomName = b.RoomName,
+                BookedBy = b.BookedBy,
+                Purpose = b.Purpose,
+                StartTime = b.StartTime.ToString("o"),
+                EndTime = b.EndTime.ToString("o"),
+                Status = (int)b.Status
+            })
+            .ToListAsync();
+
+        return Ok(bookings);
+    }
+
+    [HttpGet("{id}/availability")]
+    public async Task<ActionResult<RoomAvailabilityResponseDto>> CheckRoomAvailability(
+        int id,
+        [FromQuery] RoomAvailabilityQueryDto query)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(BuildValidationError());
+        }
+
+        var room = await _context.Rooms.FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
+        if (room == null)
+        {
+            return NotFound(new ErrorResponseDto { StatusCode = 404, Message = $"Room with ID {id} not found" });
+        }
+
+        if (!DateTime.TryParse(query.StartTime, out var startTime) || !DateTime.TryParse(query.EndTime, out var endTime))
+        {
+            return BadRequest(new ErrorResponseDto { StatusCode = 400, Message = "Invalid date format" });
+        }
+
+        if (endTime <= startTime)
+        {
+            return BadRequest(new ErrorResponseDto { StatusCode = 400, Message = "End time must be after start time" });
+        }
+
+        var conflictingBookings = await _context.RoomBookings
+            .Where(b => !b.IsDeleted &&
+                        b.RoomName == room.Name &&
+                        b.Status != _2026_campus_room_booking_backend.Enums.BookingStatus.Rejected &&
+                        ((b.StartTime < endTime && b.EndTime > startTime)))
+            .Select(b => new RoomScheduleDto
+            {
+                BookingId = b.Id,
+                RoomName = b.RoomName,
+                BookedBy = b.BookedBy,
+                Purpose = b.Purpose,
+                StartTime = b.StartTime.ToString("o"),
+                EndTime = b.EndTime.ToString("o"),
+                Status = (int)b.Status
+            })
+            .ToListAsync();
+
+        var isAvailable = !conflictingBookings.Any();
+        var message = isAvailable
+            ? "Room is available for the selected time slot"
+            : $"Room has {conflictingBookings.Count} conflicting booking(s)";
+
+        return Ok(new RoomAvailabilityResponseDto
+        {
+            RoomId = room.Id,
+            RoomName = room.Name,
+            IsAvailable = isAvailable,
+            Message = message,
+            ConflictingBookings = conflictingBookings
+        });
+    }
+
+    private ErrorResponseDto BuildValidationError()
+    {
+        var errors = ModelState
+            .Where(x => x.Value?.Errors.Count > 0)
+            .ToDictionary(
+                x => x.Key,
+                x => x.Value!.Errors.Select(e => e.ErrorMessage).ToList()
+            );
+
+        return new ErrorResponseDto { StatusCode = 400, Message = "Validation failed", Errors = errors };
     }
 
     private static RoomResponseDto MapToResponseDto(Room room)
